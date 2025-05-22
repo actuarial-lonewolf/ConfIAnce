@@ -1,0 +1,264 @@
+import streamlit as st
+import os
+import datetime
+import base64
+
+from PIL import Image, ImageEnhance
+
+from jinja2 import Environment, FileSystemLoader
+
+#import src.fraud_dict
+from src.fraud_dict import fraud_dictionary
+#from src.fraud_dict import fraud_d
+#from src.fraud_dict import *
+
+from src.custom_classes import OpenAI
+
+
+from azure.identity import ClientSecretCredential
+from azure.keyvault.secrets import SecretClient
+from azure.storage.blob import BlobServiceClient
+
+
+def render_assistant_message(message_content, message_id):
+    html_code = f'''
+    <div style="position: relative; background: #f7f7f7; border-radius: 8px; padding: 16px; margin-bottom: 8px;">
+      <div style="white-space: pre-wrap;">{message_content}</div>
+      <div style="position: absolute; bottom: 8px; right: 12px;">
+        <form action="" method="post" style="display:inline;">
+          <button name="feedback" value="up_{message_id}" style="background:none; border:none; cursor:pointer; font-size:16px; color:#888; margin-right:4px;" title="Thumbs up">👍</button>
+        </form>
+        <form action="" method="post" style="display:inline;">
+          <button name="feedback" value="down_{message_id}" style="background:none; border:none; cursor:pointer; font-size:16px; color:#888;" title="Thumbs down">👎</button>
+        </form>
+      </div>
+    </div>
+    '''
+    st.markdown(html_code, unsafe_allow_html=True)
+
+
+def img_to_base64(image_path):
+    """Convert image to base64."""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        
+        return None
+
+st.set_page_config(page_title="Desjardins ConfIAnce", layout="wide")
+st.title("Desjardins ConfIAnce")
+
+AZURE_TENANT_ID = os.environ["AZURE_TENANT_ID"]
+AZURE_CLIENT_ID = os.environ["AZURE_CLIENT_ID"]
+AZURE_CLIENT_SECRET = os.environ["AZURE_CLIENT_SECRET"]
+AZURE_KEYVAULT_NAME = os.environ["AZURE_KEYVAULT_NAME"]
+
+kv_client = SecretClient(
+        vault_url=f"https://{AZURE_KEYVAULT_NAME}.vault.azure.net/",
+        credential=ClientSecretCredential(
+            AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+        ),
+    )
+
+llm_conn = OpenAI(kv_client=kv_client)
+
+ASSISTANT_AVATAR = "avatar/alvie32.png"
+USER_AVATAR = "❔"
+
+
+
+
+env = Environment(loader=FileSystemLoader('./templates'))
+template = env.get_template('assistant_fraude_bancaire.j2')
+
+context = {
+    'role': 'Assistant IA spécialisé en détection de fraude bancaire aidant des spécialistes de la fraude à prévenir la fraude et à conseiller efficacement des victimes face aux menaces de plus en plus fréquentes et dangereuses.',
+    'objectifs': [
+        'Détecter les tentatives de fraude à partir des données historiques et des interactions en temps réel.',
+        'Fournir des conseils personnalisés aux victimes potentielles ou avérées.',
+        'Soutenir les spécialistes humains dans l’analyse et la décision.',
+        'Contribuer à la mise à jour dynamique des bases de connaissances sur la fraude.'
+    ],
+    'directives': [
+        'Offrir des réponses factuelles et contextualisées.',
+        'Respecter les lois sur la protection des données (ex. : Loi 25).',
+        'Préconiser des actions de prévention et d’escalade en cas de doute.'
+    ],
+    'contraintes': [
+        'Ne jamais divulguer ou générer de données personnelles réelles.',
+        'Ne pas conclure de manière définitive sans confirmation humaine.',
+        'Éviter toute spéculation non fondée.'
+    ],
+    'ton': 'professionnel, rassurant et pédagogique',
+    'public': 'des experts en sécurité, des conseillers bancaires et des clients ayant un niveau de connaissance variable',
+    'principes': [
+        'Baser toute recommandation sur des preuves ou tendances documentées.',
+        'Être transparent sur les limites de l’analyse automatique.',
+        'Préférer une approche préventive et explicative.'
+    ]
+}
+
+system_message = template.render(context)
+#print(system_message)
+
+
+
+
+
+st.html(
+    """
+<style>
+[data-testid="stSidebarContent"] {
+    color: white;
+    background-color: #4F5963;
+}
+</style>
+"""
+)
+
+# Sidebar (collapsible)
+with st.sidebar:
+    st.title("À propos")
+    st.write("Détectez la fraude, évaluez votre situation et obtenez des solutions adaptées.")
+    st.markdown("**References:**")
+    #st.markdown("- [Fraud Prevention Tips](#)")
+    st.markdown(
+    '- <a href="https://antifraudcentre-centreantifraude.ca/index-fra.htm" style="color: #00874E; text-decoration: underline;" target="_blank">Centre Anti-Fraude Canadien</a>',
+    unsafe_allow_html=True)
+    st.markdown(
+    '- <a href="https://www.desjardins.com/securite/index.jsp" style="color: #00874E; text-decoration: underline;" target="_blank">Desjardins Sécurité</a>',
+    unsafe_allow_html=True)
+    st.write(f"**Date:** {datetime.date.today()}")
+    st.markdown("---")
+    st.caption("Solutionné avec ❤️ par les Hackstreet Boys")
+
+
+        # Load and display image with glowing effect
+    img_path = "avatar/hackathon2025_small.png"
+    img_base64 = img_to_base64(img_path)
+    if img_base64:
+        st.sidebar.markdown(
+            f'<div style="text-align: center;"><img src="data:image/png;base64,{img_base64}" class="cover-glow"> </div>',
+            unsafe_allow_html=True,
+        )
+
+
+# Top right: Contact button
+st.markdown(
+    """
+    <div style='position: absolute; top: 10px; right: 20px;'>
+        <a href='tel:1-800-DESJARDINS'>
+            <button style='background-color:#0072c6; color:white; padding:10px 20px; border:none; border-radius:5px; font-size:16px;'>
+                Appelez-nous
+            </button>
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+#st.title("Fraud Awareness Chatbot")
+
+# Initialize session state
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "system", "content": (
+            "Vous êtes un assistant de prévention contre la fraude."
+            "Posez des questions étape par étape à l'utilisateur afin de comprendre sa situation."
+            "Une fois que vous avez suffisamment d'informations, évaluez la probabilité de fraude,"
+            "identifiez le type de fraude (à partir du dictionnaire), décrivez-le et suggérez les prochaines étapes."
+            "Voici le dictionnaire des fraudes à titre de référence :\n"
+            f"{fraud_dictionary}\n"
+            "Commencez par saluer l'utilisateur et poser votre première question."
+        )},
+        {"role": "assistant", "content": (
+            "Bonjour, je suis ici pour vous aider à examiner toute situation qui vous semble inhabituelle ou suspecte. \n\n"
+            "N'hésitez pas à me décrire ce qui s'est passé, même si cela vous paraît anodin. \n\n"
+            "Ensemble, nous allons y voir plus clair et déterminer s’il pourrait s’agir d’une tentative de fraude. \n\n"
+            "Que s’est-il passé exactement ?"
+        )}
+    ]
+
+if "assessment_complete" not in st.session_state:
+    st.session_state.assessment_complete = False
+
+
+# Display conversation history
+#for message in st.session_state.messages:
+#    if message["role"] != "system":
+#        with st.chat_message(message["role"]):
+#            st.markdown(message["content"])
+
+# Display chat history with custom avatars
+for i, message in enumerate(st.session_state.messages):
+    if message["role"] != "system":
+        if message["role"] == "assistant":
+            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+                st.markdown(message["content"])
+                left_col, right_col = st.columns([4, 1]) 
+                with right_col:
+                    sentiment_mapping = [":material/thumb_down:", ":material/thumb_up:"]
+                    selected = st.feedback("thumbs", key=f"feedback_{i}")
+                    if selected is not None:
+                    # st.markdown(f"You selected: {sentiment_mapping[selected]}")     
+                        st.caption(f"_Merci de la rétroaction._")
+        else:
+            with st.chat_message("user", avatar=USER_AVATAR):
+                st.markdown(message["content"])
+                
+
+
+
+
+# Only allow new input if assessment is not complete
+if not st.session_state.assessment_complete:
+    user_input = st.chat_input("Your response")
+    if user_input:
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        #print(user_input)
+        # Prepare context for OpenAI
+        #context = st.session_state.messages[-10:]  # last 10 messages for brevity
+        context = st.session_state.messages[-10:]  # last 10 messages for brevity
+        #print(st.session_state.messages)
+        #print(st.session_state.messages[-10:])
+
+        # Call OpenAI
+        #client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        #response = client.chat.completions.create(
+        #    model="gpt-3.5-turbo",
+        #    messages=context,
+        #    max_tokens=500,
+        #)
+ 
+  # Prepare messages for API (custom format required)
+        api_messages = {
+            "messages": [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in st.session_state.messages
+                if msg["role"] != "system"  # Include system prompt only once
+            ]
+        }
+        api_messages["messages"].insert(0, st.session_state.messages[0])  # Add system prompt
+
+      # Get LLM response using custom method
+        print(api_messages)
+        bot_response = llm_conn.generic_completion(messages=api_messages)
+
+        # Add assistant response to history
+        st.session_state.messages.append({"role": "assistant", "content": bot_response})
+
+        # Check if the LLM says assessment is complete
+        if "Based on the information provided" in bot_response or "Here is my assessment" in bot_response:
+            st.session_state.assessment_complete = True
+        st.rerun()
+else:
+    st.info("Assessment complete. If you have more questions, please start a new chat or contact us.")
+
+
+# Display chat history
+#for message in st.session_state.messages:
+#    with st.chat_message(message["role"]):
+#        st.markdown(message["content"])
+
